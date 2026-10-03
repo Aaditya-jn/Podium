@@ -4,7 +4,7 @@
 - Next.js App Router with TypeScript and React.
 - Tailwind CSS v4 for utility styling, with custom tokens in `app/globals.css`.
 - Zod for validating route inputs and model output.
-- LLM calls belong exclusively in server route handlers. Read secrets from environment variables; never prefix secrets with `NEXT_PUBLIC_`.
+- LLM requests are invoked only by server route handlers through `server-only` helpers. Read secrets from environment variables; never prefix secrets with `NEXT_PUBLIC_`.
 - Vitest will cover pure scoring and anti-cheat logic.
 - Browser `localStorage` is the only planned history store. Do not add login, authentication, a database, or a leaderboard.
 - Target deployment: Vercel.
@@ -18,6 +18,7 @@
 
 ## Conventions
 - Keep category definitions and curated topics data-driven in `lib/config/categories.ts`.
+- Keep trending source mappings in `lib/trending/sources.ts`; provider requests and prompt construction remain in server-only modules invoked by route handlers.
 - Add API endpoints as `app/api/**/route.ts`; validate untrusted input at the route boundary.
 - Keep reusable UI in `components/` and pure domain logic in `lib/`.
 - Prefer server components; add `"use client"` only for browser interactions.

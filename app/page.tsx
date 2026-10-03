@@ -4,16 +4,41 @@ import { useState } from "react";
 
 import { categories, difficulties, type Difficulty } from "@/lib/config/categories";
 
-type Topic = { topic: string; category: string; difficulty: Difficulty; source: "curated" };
+type Topic = {
+  topic: string;
+  category: string;
+  difficulty: Difficulty;
+  source: "trending" | "classic";
+  source_title: string;
+  source_url: string;
+  published_at: string;
+  source_name: string;
+  style: "explainer" | "pros-cons" | "personal-experience" | "classic";
+};
+type RecentTopic = { topic: string; style: Topic["style"] };
 type Mode = "speak" | "write";
 
-function readRecentTopics(): string[] {
+function readRecentTopics(): RecentTopic[] {
   try {
     const value: unknown = JSON.parse(window.localStorage.getItem("podium:recent-topics") ?? "[]");
-    return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string").slice(0, 20) : [];
+    if (!Array.isArray(value)) return [];
+    return value.flatMap((item): RecentTopic[] => {
+      if (typeof item === "string") return [{ topic: item, style: "classic" }];
+      if (item && typeof item === "object" && "topic" in item && typeof item.topic === "string") {
+        const style = "style" in item && ["explainer", "pros-cons", "personal-experience", "classic"].includes(String(item.style))
+          ? item.style as Topic["style"]
+          : "classic";
+        return [{ topic: item.topic, style }];
+      }
+      return [];
+    }).slice(0, 30);
   } catch {
     return [];
   }
+}
+
+function formatPublishedDate(value: string) {
+  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" }).format(new Date(value));
 }
 
 export default function Home() {
@@ -36,14 +61,19 @@ export default function Home() {
           categoryId,
           customCategory,
           difficulty,
-          recentTopics: readRecentTopics(),
+          recentTopics: readRecentTopics().map((item) => item.topic),
+          recentStyles: readRecentTopics().map((item) => item.style),
         }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error ?? "We couldn't find a prompt right now.");
-      setTopic(data as Topic);
+      const newTopic = data as Topic;
+      setTopic(newTopic);
       const recentTopics = readRecentTopics();
-      window.localStorage.setItem("podium:recent-topics", JSON.stringify([data.topic, ...recentTopics.filter((item) => item !== data.topic)].slice(0, 20)));
+      window.localStorage.setItem("podium:recent-topics", JSON.stringify([
+        { topic: newTopic.topic, style: newTopic.style },
+        ...recentTopics.filter((item) => item.topic !== newTopic.topic),
+      ].slice(0, 30)));
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Something went wrong. Please try again.");
     } finally {
@@ -103,7 +133,7 @@ export default function Home() {
 
           <div className="card-bottom"><div className="privacy-note"><span className="lock-icon">◇</span><span>Your practice is personal.<br /><b>No account needed.</b></span></div><button className="start-button" type="button" onClick={getTopic} disabled={loading || (categoryId === "custom" && !customCategory.trim())}><span>{loading ? "Finding a prompt…" : "Get my topic"}</span><span className="button-arrow">↗</span></button></div>
           {error && <p className="error-message" role="alert">{error}</p>}
-          {topic && <div className="topic-result" aria-live="polite"><div className="topic-kicker"><span>YOUR TOPIC</span><button type="button" onClick={getTopic} disabled={loading} aria-label="Shuffle topic">⟳ Shuffle</button></div><p>{topic.topic}</p><span className="topic-meta">{topic.category} <i>·</i> {topic.difficulty} <i>·</i> {mode === "speak" ? "Speaking" : "Writing"}</span><p className="topic-next">Next up: your practice space, timer, and live notes. <span>COMING IN PHASE 2</span></p></div>}
+          {topic && <div className="topic-result" aria-live="polite"><div className="topic-kicker"><span>YOUR TOPIC</span><button type="button" onClick={getTopic} disabled={loading} aria-label="Shuffle topic">⟳ Shuffle</button></div><p>{topic.topic}</p><span className="topic-meta">{topic.category} <i>·</i> {topic.difficulty} <i>·</i> {mode === "speak" ? "Speaking" : "Writing"}</span><p className="topic-source-label">{topic.source === "trending" ? <><span className="trending-pill">Trending</span><a href={topic.source_url} target="_blank" rel="noreferrer noopener" title={topic.source_title}>{topic.source_name} · {formatPublishedDate(topic.published_at)} ↗</a></> : <span className="classic-pill">Classic</span>}</p><p className="topic-next">Next up: your practice space, timer, and live notes. <span>COMING IN PHASE 2</span></p></div>}
         </section>
 
         <footer className="page-footer"><span>MADE FOR THE MOMENT BEFORE YOU SPEAK.</span><span>© 2026 PODIUM <i>✳</i></span></footer>
