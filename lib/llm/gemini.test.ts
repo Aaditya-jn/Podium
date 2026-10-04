@@ -47,4 +47,17 @@ describe("Gemini structured-output adapter", () => {
 
     await expect(geminiAdapter.generateStructuredJson({ prompt: "", schema: {} })).rejects.toThrow();
   });
+
+  it("sends transcription audio inline without creating a provider file", async () => {
+    process.env.GEMINI_API_KEY = "test-key";
+    const fetchMock = vi.fn<typeof fetch>(async () => new Response(JSON.stringify({
+      candidates: [{ content: { parts: [{ text: "A short test transcript." }] } }],
+    }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(geminiAdapter.transcribeAudio({ audioBase64: "YXVkaW8=", mimeType: "audio/webm" })).resolves.toBe("A short test transcript.");
+    const body = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body)) as { contents: { parts: { text?: string; inlineData?: { data: string; mimeType: string } }[] }[] };
+    expect(body.contents[0]?.parts[0]?.text).toContain("Transcribe the spoken words");
+    expect(body.contents[0]?.parts[1]?.inlineData).toEqual({ data: "YXVkaW8=", mimeType: "audio/webm" });
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain(":generateContent");
+  });
 });

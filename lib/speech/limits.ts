@@ -1,0 +1,2 @@
+export const MAX_SPEECH_AUDIO_DURATION_MS = 120_000;
+export const MAX_SPEECH_AUDIO_BYTES = 8 * 1024 * 1024;

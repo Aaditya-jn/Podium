@@ -6,4 +6,5 @@ export interface LlmAdapter {
     schema: JsonSchema;
     temperature?: number;
   }): Promise<unknown>;
+  transcribeAudio(input: { audioBase64: string; mimeType: string }): Promise<string>;
 }
