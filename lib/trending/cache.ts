@@ -3,7 +3,7 @@ import "server-only";
 import { getCategory } from "@/lib/config/categories";
 import { fetchFromSearch } from "@/lib/trending/adapters";
 import { cleanCandidates, dedupeBySimilarity } from "@/lib/trending/filters";
-import { generateTopicsWithGemini } from "@/lib/trending/gemini";
+import { generateTrendingTopics } from "@/lib/trending/generate";
 import { isSafeTopic } from "@/lib/trending/safety";
 import { trendingQueriesByCategory } from "@/lib/trending/queries";
 import type { TrendingCandidate, TrendingTopic } from "@/lib/trending/types";
@@ -28,7 +28,7 @@ async function buildTrendingList(categoryId: string): Promise<TrendingTopic[]> {
     .slice(0, 10);
   if (candidates.length < 3) return [];
 
-  const generated = await generateTopicsWithGemini(category.name, candidates);
+  const generated = await generateTrendingTopics(category.name, candidates);
   const byTitle = new Map(candidates.map((candidate) => [candidate.title, candidate]));
   const topics = generated.flatMap((generatedTopic) => {
     const candidate = byTitle.get(generatedTopic.source_title);

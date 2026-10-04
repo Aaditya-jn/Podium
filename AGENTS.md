@@ -18,7 +18,8 @@
 
 ## Conventions
 - Keep category definitions and curated topics data-driven in `lib/config/categories.ts`.
-- Keep trending source mappings in `lib/trending/sources.ts`; provider requests and prompt construction remain in server-only modules invoked by route handlers.
+- Keep trending queries in `lib/trending/queries.ts` and provider requests in server-only adapters under `lib/trending/` and `lib/llm/`.
+- Keep LLM providers swappable through the adapter in `lib/llm/`; read provider keys from server environment variables and validate every structured response with Zod.
 - Add API endpoints as `app/api/**/route.ts`; validate untrusted input at the route boundary.
 - Keep reusable UI in `components/` and pure domain logic in `lib/`.
 - Prefer server components; add `"use client"` only for browser interactions.
