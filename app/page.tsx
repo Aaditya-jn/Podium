@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { categories, difficulties, type Difficulty } from "@/lib/config/categories";
+import PracticeSession, { type AttemptResult } from "@/components/practice-session";
 
 type Topic = {
   topic: string;
@@ -17,6 +18,21 @@ type Topic = {
 };
 type RecentTopic = { topic: string; style: Topic["style"] };
 type Mode = "speak" | "write";
+type Screen = "home" | "practice" | "results";
+
+function readAttempts(): AttemptResult[] {
+  try {
+    const value: unknown = JSON.parse(window.localStorage.getItem("podium:attempts") ?? "[]");
+    if (!Array.isArray(value)) return [];
+    return value.flatMap((item): AttemptResult[] => item && typeof item === "object"
+      && "id" in item && typeof item.id === "string"
+      && "topic" in item && typeof item.topic === "string"
+      && "score" in item && typeof item.score === "number"
+      && "createdAt" in item && typeof item.createdAt === "string"
+      ? [item as AttemptResult]
+      : []).slice(0, 20);
+  } catch { return []; }
+}
 
 function readRecentTopics(): RecentTopic[] {
   try {
@@ -49,6 +65,14 @@ export default function Home() {
   const [topic, setTopic] = useState<Topic | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [screen, setScreen] = useState<Screen>("home");
+  const [attempts, setAttempts] = useState<AttemptResult[]>([]);
+  const [result, setResult] = useState<AttemptResult | null>(null);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setAttempts(readAttempts()), 0);
+    return () => window.clearTimeout(timer);
+  }, []);
 
   async function getTopic() {
     setLoading(true);
@@ -69,6 +93,7 @@ export default function Home() {
       if (!response.ok) throw new Error(data.error ?? "We couldn't find a prompt right now.");
       const newTopic = data as Topic;
       setTopic(newTopic);
+      setScreen("practice");
       const recentTopics = readRecentTopics();
       window.localStorage.setItem("podium:recent-topics", JSON.stringify([
         { topic: newTopic.topic, style: newTopic.style },
@@ -81,13 +106,28 @@ export default function Home() {
     }
   }
 
+  function completeAttempt(attempt: AttemptResult) {
+    const next = [attempt, ...attempts].slice(0, 20);
+    setAttempts(next);
+    try { window.localStorage.setItem("podium:attempts", JSON.stringify(next)); } catch { /* history is optional */ }
+    setResult(attempt);
+    setScreen("results");
+  }
+
+  function startAnotherTopic() {
+    setResult(null);
+    setTopic(null);
+    setScreen("home");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
   return (
     <main className="min-h-screen overflow-hidden">
       <div className="ambient ambient-one" aria-hidden="true" />
       <div className="ambient ambient-two" aria-hidden="true" />
       <div className="site-shell">
         <header className="topbar">
-          <a className="brand" href="#home" aria-label="Podium home">
+          <a className="brand" href="#home" aria-label="Podium home" onClick={(event) => { if (screen !== "home") { event.preventDefault(); startAnotherTopic(); } }}>
             <span className="brand-mark" aria-hidden="true"><span /><span /><span /></span>
             <span>podium</span>
           </a>
@@ -111,7 +151,25 @@ export default function Home() {
           </div>
         </section>
 
-        <section className="practice-card" aria-labelledby="practice-title">
+        {screen === "practice" && topic && <PracticeSession key={`${topic.topic}-${mode}`} topic={topic} mode={mode} onBack={() => setScreen("home")} onComplete={completeAttempt} onShuffle={getTopic} shuffling={loading} />}
+
+        {screen === "results" && result && <section className="practice-card results-card" aria-labelledby="results-title">
+          <div className="session-kicker"><span className="step-pill"><span>03</span> &nbsp; YOUR REVIEW</span><span className="topic-meta">{result.category} · {result.mode === "speak" ? "Speaking" : "Writing"}</span></div>
+          <div className="results-score-row"><div><p className="field-optional">PRACTICE SCORE</p><strong className="results-score">{result.score}<small>/100</small></strong></div><div className="results-summary"><span>{result.wordCount} words</span><span>{result.paceWpm} wpm</span><span>{Math.floor(result.durationSeconds / 60)}:{String(result.durationSeconds % 60).padStart(2, "0")} practiced</span></div></div>
+          <h2 id="results-title">A little progress, every time.</h2>
+          <div className="breakdown-grid">{[["Length", result.breakdown.length, 40], ["Vocabulary", result.breakdown.vocabulary, 25], ["Clarity", result.breakdown.clarity, 20], ["Pace", result.breakdown.pace, 15]].map(([label, value, max]) => <div className="breakdown-item" key={String(label)}><span>{label}</span><strong>{value}<small>/{max}</small></strong><div className="breakdown-track"><i style={{ width: `${(Number(value) / Number(max)) * 100}%` }} /></div></div>)}</div>
+          {result.flags > 0 && <p className="flag-note" role="status">This attempt had {result.flags} anti-copy-paste flag{result.flags === 1 ? "" : "s"}. Each flag reduced the score by 5 points. {result.labels.join(" · ")}</p>}
+          {result.reviewFallback ? <div className="review-section"><p>{result.review.structure_feedback}</p></div> : <>
+            <div className="review-section"><h3>Structure & flow</h3><p>{result.review.structure_feedback}</p></div>
+            <div className="review-columns"><div><h3>What worked</h3><ul>{result.review.strengths.map((item, index) => <li key={index}>{item}</li>)}</ul></div><div><h3>Try next</h3><ul>{result.review.improvements.map((item, index) => <li key={index}>{item}</li>)}</ul></div></div>
+            {result.review.grammar_corrections.length > 0 && <div className="review-section"><h3>Language notes</h3>{result.review.grammar_corrections.map((item, index) => <p key={index}><b>{item.original}</b> → {item.suggestion} <span>{item.reason}</span></p>)}</div>}
+            {result.review.improved_sentence && <div className="improved-sentence"><span>ONE WAY TO REPHRASE</span><p>{result.review.improved_sentence}</p></div>}
+          </>}
+          {result.deliveryInsights && <div className="delivery-results"><p className="camera-eyebrow">OPTIONAL · NOT SCORED</p><h3>Delivery insights</h3>{result.deliveryInsights.lowConfidence ? <p>Detection quality was low during this session, so these measurements may not be reliable.</p> : <div className="delivery-metrics"><p><b>{result.deliveryInsights.facePresencePercent}%</b><span>face in frame</span></p><p><b>{result.deliveryInsights.handsInFramePercent}%</b><span>hands in frame</span></p><p><b>{result.deliveryInsights.gestureActivityPerMinute}</b><span>gesture changes/min</span></p><p><b>{result.deliveryInsights.averageShoulderTiltChangeDegrees}°</b><span>average shoulder tilt change</span></p><p><b>{result.deliveryInsights.averageTorsoLeanChangeDegrees}°</b><span>average torso lean change</span></p><p><b>{result.deliveryInsights.fidgetMovementsPerMinute}</b><span>small movement reversals/min</span></p></div>}<p className="delivery-caveat">These are suggestions about observable movement only, not emotion or personality. Lighting, glasses, camera angle, and individual differences can affect measurements.</p></div>}
+          <button className="start-button result-next-button" type="button" onClick={startAnotherTopic}><span>Try another topic</span><span className="button-arrow">↗</span></button>
+        </section>}
+
+        {screen === "home" && <section className="practice-card" aria-labelledby="practice-title">
           <div className="card-topline"><span className="step-pill"><span>01</span> &nbsp; START HERE</span><span className="card-meta">TAKES JUST A FEW MINUTES <span>↗</span></span></div>
           <div className="card-heading-row">
             <div><h2 id="practice-title">Set the scene.</h2><p>Choose what feels right for today.</p></div>
@@ -133,8 +191,10 @@ export default function Home() {
 
           <div className="card-bottom"><div className="privacy-note"><span className="lock-icon">◇</span><span>Your practice is personal.<br /><b>No account needed.</b></span></div><button className="start-button" type="button" onClick={getTopic} disabled={loading || (categoryId === "custom" && !customCategory.trim())}><span>{loading ? "Finding a prompt…" : "Get my topic"}</span><span className="button-arrow">↗</span></button></div>
           {error && <p className="error-message" role="alert">{error}</p>}
-          {topic && <div className="topic-result" aria-live="polite"><div className="topic-kicker"><span>YOUR TOPIC</span><button type="button" onClick={getTopic} disabled={loading} aria-label="Shuffle topic">⟳ Shuffle</button></div><p>{topic.topic}</p><span className="topic-meta">{topic.category} <i>·</i> {topic.difficulty} <i>·</i> {mode === "speak" ? "Speaking" : "Writing"}</span><p className="topic-source-label">{topic.source === "trending" ? <><span className="trending-pill">Trending</span><a href={topic.source_url} target="_blank" rel="noreferrer noopener" title={topic.source_title}>{topic.source_name} · {formatPublishedDate(topic.published_at)} ↗</a></> : <span className="classic-pill">Classic</span>}</p><p className="topic-next">Next up: your practice space, timer, and live notes. <span>COMING IN PHASE 2</span></p></div>}
+          {topic && <div className="topic-result" aria-live="polite"><div className="topic-kicker"><span>YOUR TOPIC</span><button type="button" onClick={getTopic} disabled={loading} aria-label="Shuffle topic">⟳ Shuffle</button></div><p>{topic.topic}</p><span className="topic-meta">{topic.category} <i>·</i> {topic.difficulty} <i>·</i> {mode === "speak" ? "Speaking" : "Writing"}</span><p className="topic-source-label">{topic.source === "trending" ? <><span className="trending-pill">Trending</span><a href={topic.source_url} target="_blank" rel="noreferrer noopener" title={topic.source_title}>{topic.source_name} · {formatPublishedDate(topic.published_at)} ↗</a></> : <span className="classic-pill">Classic</span>}</p><button className="start-button" type="button" onClick={() => setScreen("practice")}><span>Start practice</span><span className="button-arrow">↗</span></button></div>}
+          {attempts.length > 0 && <section className="recent-attempts" aria-labelledby="recent-title"><div><h3 id="recent-title">Your recent attempts</h3><p>Personal best <strong>{Math.max(...attempts.map((item) => item.score))}/100</strong></p></div><button className="text-button" type="button" onClick={() => { try { window.localStorage.removeItem("podium:attempts"); } catch { /* history may be unavailable */ } setAttempts([]); }}>Clear history</button><ul>{attempts.slice(0, 3).map((item) => <li key={item.id}><span>{item.topic}</span><strong>{item.score}</strong><small>{new Intl.DateTimeFormat("en", { month: "short", day: "numeric" }).format(new Date(item.createdAt))}</small></li>)}</ul></section>}
         </section>
+        }
 
         <footer className="page-footer"><span>MADE FOR THE MOMENT BEFORE YOU SPEAK.</span><span>© 2026 PODIUM <i>✳</i></span></footer>
       </div>

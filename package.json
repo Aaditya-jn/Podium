@@ -10,6 +10,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@mediapipe/tasks-vision": "^1.0.1",
     "fast-xml-parser": "^5.11.2",
     "next": "^16.0.0",
     "react": "^19.2.0",
