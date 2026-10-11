@@ -2,17 +2,12 @@ import type { DeliveryTracker, VisionSample } from "@/lib/vision/types";
 
 const TASKS_VISION_WASM = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.0.1/wasm";
 const FACE_MODEL = "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task";
-const HAND_MODEL = "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task";
-const POSE_MODEL = "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task";
 const SAMPLE_INTERVAL_MS = 100;
 
 type MediaPipeModule = typeof import("@mediapipe/tasks-vision");
 type Tasks = {
   face: import("@mediapipe/tasks-vision").FaceLandmarker;
-  hands: import("@mediapipe/tasks-vision").HandLandmarker;
-  pose: import("@mediapipe/tasks-vision").PoseLandmarker;
 };
-type Point = { x: number; y: number };
 type Blendshape = { categoryName?: string; score?: number };
 
 function average(values: number[]) {
@@ -35,13 +30,18 @@ function largestFaceIndex(faces: Array<Array<{ x: number; y: number }>> | undefi
 function headPose(matrix: unknown) {
   const values = matrix && typeof matrix === "object" && "data" in matrix ? Array.from((matrix as { data: ArrayLike<number> }).data) : [];
   if (values.length < 16) return { yaw: 0, pitch: 0, roll: 0 };
-  return { yaw: Math.atan2(values[8], values[10]), pitch: Math.atan2(-values[9], Math.hypot(values[8], values[10])), roll: Math.atan2(values[4], values[0]) };
+  const rawYaw = Math.atan2(values[8], values[10]);
+  const rawPitch = Math.atan2(-values[9], Math.hypot(values[8], values[10]));
+  const rawRoll = Math.atan2(values[4], values[0]);
+  return {
+    yaw: rawYaw === 0 ? 0 : rawYaw,
+    pitch: rawPitch === 0 ? 0 : rawPitch,
+    roll: rawRoll === 0 ? 0 : rawRoll,
+  };
 }
 
 function closeTasks(tasks: Partial<Tasks>) {
   tasks.face?.close();
-  tasks.hands?.close();
-  tasks.pose?.close();
 }
 
 async function createTasks(vision: MediaPipeModule, fileset: Awaited<ReturnType<MediaPipeModule["FilesetResolver"]["forVisionTasks"]>>, delegate: "GPU" | "CPU"): Promise<Tasks> {
@@ -53,21 +53,6 @@ async function createTasks(vision: MediaPipeModule, fileset: Awaited<ReturnType<
       numFaces: 3,
       outputFaceBlendshapes: true,
       outputFacialTransformationMatrixes: true,
-    });
-    tasks.hands = await vision.HandLandmarker.createFromOptions(fileset, {
-      baseOptions: { modelAssetPath: HAND_MODEL, delegate },
-      runningMode: "VIDEO",
-      numHands: 2,
-      minHandDetectionConfidence: 0.5,
-      minHandPresenceConfidence: 0.5,
-    });
-    tasks.pose = await vision.PoseLandmarker.createFromOptions(fileset, {
-      baseOptions: { modelAssetPath: POSE_MODEL, delegate },
-      runningMode: "VIDEO",
-      numPoses: 1,
-      minPoseDetectionConfidence: 0.5,
-      minPosePresenceConfidence: 0.5,
-      outputSegmentationMasks: false,
     });
     return tasks as Tasks;
   } catch (error) {
@@ -83,7 +68,6 @@ export class MediaPipeDeliveryTracker implements DeliveryTracker {
   private running = false;
   private lastSampleAt = 0;
   private lastVideoTime = -1;
-  private previousHandWrists: Point[] = [];
   private generation = 0;
 
   onSample(listener: (sample: VisionSample) => void) {
@@ -140,15 +124,12 @@ export class MediaPipeDeliveryTracker implements DeliveryTracker {
     cancelAnimationFrame(this.frameRequest);
     closeTasks(this.tasks ?? {});
     this.tasks = null;
-    this.previousHandWrists = [];
     this.lastVideoTime = -1;
   }
 
   private sample(video: HTMLVideoElement, timestamp: number): VisionSample {
     if (!this.tasks) throw new Error("Vision tracker has not started");
     const faceResult = this.tasks.face.detectForVideo(video, timestamp);
-    const handResult = this.tasks.hands.detectForVideo(video, timestamp);
-    const poseResult = this.tasks.pose.detectForVideo(video, timestamp);
     const faceIndex = largestFaceIndex(faceResult.faceLandmarks);
     const blendshapes = faceIndex >= 0 ? faceResult.faceBlendshapes?.[faceIndex]?.categories as Blendshape[] | undefined : undefined;
     const facePose = headPose(faceIndex >= 0 ? faceResult.facialTransformationMatrixes?.[faceIndex] : undefined);
@@ -157,38 +138,6 @@ export class MediaPipeDeliveryTracker implements DeliveryTracker {
     const smileAmount = blendshapeScore(blendshapes, ["mouthSmileLeft", "mouthSmileRight"]);
     const mouthActivity = blendshapeScore(blendshapes, ["jawOpen", "mouthFunnel", "mouthPucker", "mouthPressLeft", "mouthPressRight"]);
     const blinkAmount = blendshapeScore(blendshapes, ["eyeBlinkLeft", "eyeBlinkRight"]);
-
-    const wrists = (handResult.landmarks ?? []).flatMap((landmarks) => {
-      const wrist = landmarks[0];
-      return wrist ? [{ x: wrist.x, y: wrist.y }] : [];
-    });
-    const handDeltaX = average(wrists.map((point, index) => point.x - (this.previousHandWrists[index]?.x ?? point.x)));
-    const handDeltaY = average(wrists.map((point, index) => point.y - (this.previousHandWrists[index]?.y ?? point.y)));
-    this.previousHandWrists = wrists.map(({ x, y }) => ({ x, y }));
-
-    const handedness = handResult.handedness ?? [];
-    const handConfidence = average(handedness.map((categories) => categories[0]?.score ?? 0));
-    const pose = poseResult.landmarks?.[0] ?? [];
-    const requiredPoints = [pose[11], pose[12], pose[23], pose[24]];
-    const poseConfidence = average(requiredPoints.map((point) => point?.visibility ?? 0));
-    const leftShoulder = pose[11];
-    const rightShoulder = pose[12];
-    const leftHip = pose[23];
-    const rightHip = pose[24];
-    const hasPose = requiredPoints.every(Boolean);
-
-    let shoulderTiltDegrees: number | null = null;
-    let torsoLeanDegrees: number | null = null;
-    let shoulderDepth: number | null = null;
-    if (hasPose && leftShoulder && rightShoulder && leftHip && rightHip) {
-      shoulderTiltDegrees = Math.atan2(rightShoulder.y - leftShoulder.y, rightShoulder.x - leftShoulder.x) * 180 / Math.PI;
-      const shoulderX = (leftShoulder.x + rightShoulder.x) / 2;
-      const hipX = (leftHip.x + rightHip.x) / 2;
-      const shoulderY = (leftShoulder.y + rightShoulder.y) / 2;
-      const hipY = (leftHip.y + rightHip.y) / 2;
-      torsoLeanDegrees = Math.atan2(shoulderX - hipX, Math.abs(hipY - shoulderY)) * 180 / Math.PI;
-      shoulderDepth = (leftShoulder.z + rightShoulder.z - leftHip.z - rightHip.z) / 2;
-    }
 
     return {
       timestamp,
@@ -202,14 +151,6 @@ export class MediaPipeDeliveryTracker implements DeliveryTracker {
       smileAmount,
       mouthActivity,
       blinkAmount,
-      handsPresent: wrists.length > 0,
-      handConfidence,
-      handDeltaX,
-      handDeltaY,
-      shoulderTiltDegrees,
-      torsoLeanDegrees,
-      shoulderDepth,
-      poseConfidence: hasPose ? poseConfidence : 0,
     };
   }
 }

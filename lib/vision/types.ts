@@ -10,14 +10,14 @@ export type VisionSample = {
   smileAmount: number;
   mouthActivity: number;
   blinkAmount: number;
-  handsPresent: boolean;
-  handConfidence: number;
-  handDeltaX: number;
-  handDeltaY: number;
-  shoulderTiltDegrees: number | null;
-  torsoLeanDegrees: number | null;
-  shoulderDepth: number | null;
-  poseConfidence: number;
+  handsPresent?: boolean;
+  handConfidence?: number;
+  handDeltaX?: number;
+  handDeltaY?: number;
+  shoulderTiltDegrees?: number | null;
+  torsoLeanDegrees?: number | null;
+  shoulderDepth?: number | null;
+  poseConfidence?: number;
 };
 
 export type DeliveryTracker = {

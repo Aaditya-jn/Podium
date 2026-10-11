@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 
 import { categories, difficulties, type Difficulty } from "@/lib/config/categories";
 import PracticeSession, { type AttemptResult } from "@/components/practice-session";
+import DeliveryInsightsView from "@/components/delivery-insights-view";
+import ImprovementConsent from "@/components/improvement-consent";
 
 type Topic = {
   topic: string;
@@ -166,7 +168,23 @@ export default function Home() {
           {result.review.improved_sentence && <div className="improved-sentence"><span>ONE WAY TO REPHRASE</span><p>{result.review.improved_sentence}</p></div>}
           </>}
           {result.transcriptionSource === "audio-fallback" && <div className="review-section result-transcript"><h3>Your transcript</h3><p>{result.text}</p></div>}
-          {result.deliveryInsights && <div className="delivery-results"><p className="camera-eyebrow">OPTIONAL · NOT SCORED</p><h3>Delivery insights</h3>{result.deliveryInsights.lowConfidence ? <p>Detection quality was low during this session, so these measurements may not be reliable.</p> : <div className="delivery-metrics"><p><b>{result.deliveryInsights.facePresencePercent}%</b><span>face in frame</span></p><p><b>{result.deliveryInsights.handsInFramePercent}%</b><span>hands in frame</span></p><p><b>{result.deliveryInsights.gestureActivityPerMinute}</b><span>gesture changes/min</span></p><p><b>{result.deliveryInsights.averageShoulderTiltChangeDegrees}°</b><span>average shoulder tilt change</span></p><p><b>{result.deliveryInsights.averageTorsoLeanChangeDegrees}°</b><span>average torso lean change</span></p><p><b>{result.deliveryInsights.fidgetMovementsPerMinute}</b><span>small movement reversals/min</span></p></div>}<p className="delivery-caveat">These are suggestions about observable movement only, not emotion or personality. Lighting, glasses, camera angle, and individual differences can affect measurements.</p></div>}
+          {result.deliveryInsights && (
+            <DeliveryInsightsView
+              metrics={result.deliveryInsights}
+              coaching={result.deliveryCoaching}
+            />
+          )}
+
+          <ImprovementConsent
+            mode={result.mode}
+            topicCategory={result.category}
+            difficulty={result.difficulty}
+            durationSeconds={result.durationSeconds}
+            wordCount={result.wordCount}
+            paceWpm={result.paceWpm}
+            deliveryMetrics={result.deliveryInsights}
+          />
+
           <button className="start-button result-next-button" type="button" onClick={startAnotherTopic}><span>Try another topic</span><span className="button-arrow">↗</span></button>
         </section>}
 

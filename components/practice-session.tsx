@@ -22,6 +22,12 @@ export type AttemptResult = {
   reviewFallback?: boolean;
   transcriptionSource?: "audio-fallback";
   deliveryInsights?: GesturePostureMetrics;
+  deliveryCoaching?: {
+    observations: string[];
+    exercises: string[];
+    strength: string;
+    fallback?: boolean;
+  };
 };
 
 type Props = { topic: Topic; mode: Mode; onBack(): void; onComplete(attempt: AttemptResult): void; onShuffle(): void; shuffling: boolean };
@@ -409,12 +415,46 @@ export default function PracticeSession({ topic, mode, onBack, onComplete, onShu
       if (!scored.ok) throw new Error(scoreData.error ?? "Your attempt could not be scored. Please try again.");
       const reviewed = await fetch("/api/review", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: content }) });
       const reviewData = await reviewed.json();
+
+      let deliveryCoachingResult: AttemptResult["deliveryCoaching"];
+      if (mode === "speak" && delivery && !delivery.notEnoughData) {
+        try {
+          const deliveryRes = await fetch("/api/delivery-review", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              durationSeconds: delivery.durationSeconds,
+              facePresencePercent: delivery.facePresencePercent,
+              gazeTowardCameraPercent: delivery.gazeTowardCameraPercent,
+              headStabilityPercent: delivery.headStabilityPercent,
+              browMovementVariety: delivery.browMovementVariety,
+              smileFrequencyPerMinute: delivery.smileFrequencyPerMinute,
+              mouthActivity: delivery.mouthActivity,
+              blinkRatePerMinute: delivery.blinkRatePerMinute,
+              segments: delivery.segments,
+            }),
+          });
+          if (deliveryRes.ok) {
+            const data = await deliveryRes.json();
+            if (data.coaching) {
+              deliveryCoachingResult = {
+                ...data.coaching,
+                fallback: Boolean(data.fallback),
+              };
+            }
+          }
+        } catch {
+          // Delivery coaching failure does not block session submission
+        }
+      }
+
       const attempt: AttemptResult = {
         id: crypto.randomUUID(), topic: topic.topic, category: topic.category, mode, difficulty: topic.difficulty,
         createdAt: new Date().toISOString(), durationSeconds: Math.round(elapsedBeforeRef.current), ...scoreData,
         text: content, review: reviewData.review, reviewFallback: Boolean(reviewData.fallback),
         transcriptionSource: audioFallbackMode ? "audio-fallback" : undefined,
         deliveryInsights: mode === "speak" ? delivery : undefined,
+        deliveryCoaching: deliveryCoachingResult,
       };
       clearAudioMemory();
       setCameraEnabled(false);

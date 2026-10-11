@@ -3,21 +3,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   resolveFileset: vi.fn(),
   createFace: vi.fn(),
-  createHands: vi.fn(),
-  createPose: vi.fn(),
   faceDetect: vi.fn(),
-  handDetect: vi.fn(),
-  poseDetect: vi.fn(),
   closeFace: vi.fn(),
-  closeHands: vi.fn(),
-  closePose: vi.fn(),
 }));
 
 vi.mock("@mediapipe/tasks-vision", () => ({
   FilesetResolver: { forVisionTasks: mocks.resolveFileset },
   FaceLandmarker: { createFromOptions: mocks.createFace },
-  HandLandmarker: { createFromOptions: mocks.createHands },
-  PoseLandmarker: { createFromOptions: mocks.createPose },
 }));
 
 import { MediaPipeDeliveryTracker } from "@/lib/vision/mediapipe-tracker";
@@ -28,20 +20,22 @@ function mockTask(detectForVideo: ReturnType<typeof vi.fn>, close: ReturnType<ty
 
 function setupMediaPipeMocks() {
   mocks.resolveFileset.mockResolvedValue({});
-  mocks.faceDetect.mockReturnValue({ faceLandmarks: [[{}]], faceBlendshapes: [], facialTransformationMatrixes: [] });
-  mocks.handDetect.mockReturnValue({
-    landmarks: [[{ x: 0.2, y: 0.3, z: 0 }]],
-    handedness: [[{ score: 0.95 }]],
+  mocks.faceDetect.mockReturnValue({
+    faceLandmarks: [[{ x: 0.5, y: 0.5 }]],
+    faceBlendshapes: [{
+      categories: [
+        { categoryName: "eyeLookInLeft", score: 0.1 },
+        { categoryName: "browInnerUp", score: 0.2 },
+        { categoryName: "mouthSmileLeft", score: 0.3 },
+        { categoryName: "jawOpen", score: 0.4 },
+        { categoryName: "eyeBlinkLeft", score: 0.05 },
+      ],
+    }],
+    facialTransformationMatrixes: [{
+      data: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
+    }],
   });
-  const poseLandmarks = Array.from({ length: 33 }, () => ({ x: 0.5, y: 0.5, z: 0, visibility: 0.9 }));
-  poseLandmarks[11] = { x: 0.4, y: 0.4, z: 0.1, visibility: 0.9 };
-  poseLandmarks[12] = { x: 0.6, y: 0.42, z: 0.1, visibility: 0.9 };
-  poseLandmarks[23] = { x: 0.45, y: 0.7, z: 0.2, visibility: 0.9 };
-  poseLandmarks[24] = { x: 0.55, y: 0.7, z: 0.2, visibility: 0.9 };
-  mocks.poseDetect.mockReturnValue({ landmarks: [poseLandmarks] });
   mocks.createFace.mockResolvedValue(mockTask(mocks.faceDetect, mocks.closeFace));
-  mocks.createHands.mockResolvedValue(mockTask(mocks.handDetect, mocks.closeHands));
-  mocks.createPose.mockResolvedValue(mockTask(mocks.poseDetect, mocks.closePose));
 }
 
 describe("MediaPipe delivery tracker", () => {
@@ -72,12 +66,17 @@ describe("MediaPipe delivery tracker", () => {
     expect(mocks.createFace.mock.calls[0]?.[1].outputFaceBlendshapes).toBe(true);
     expect(mocks.createFace.mock.calls[0]?.[1].outputFacialTransformationMatrixes).toBe(true);
     expect(onSample).toHaveBeenCalledOnce();
-    expect(onSample.mock.calls[0]?.[0]).toMatchObject({ facePresent: true, handsPresent: true, handConfidence: 0.95 });
+    expect(onSample.mock.calls[0]?.[0]).toMatchObject({
+      facePresent: true,
+      faceConfidence: 1,
+      headYaw: 0,
+      headPitch: 0,
+      headRoll: 0,
+    });
+    expect(onSample.mock.calls[0]?.[0]).not.toHaveProperty("faceLandmarks");
     expect(onSample.mock.calls[0]?.[0]).not.toHaveProperty("landmarks");
     tracker.stop();
     expect(mocks.closeFace).toHaveBeenCalledOnce();
-    expect(mocks.closeHands).toHaveBeenCalledOnce();
-    expect(mocks.closePose).toHaveBeenCalledOnce();
   });
 
   it("recreates tasks with the CPU delegate when GPU initialization fails", async () => {

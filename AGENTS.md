@@ -26,6 +26,10 @@
 - Keep components accessible: semantic HTML, labels, keyboard support, and visible focus.
 - Do not trust client-supplied scores. Recompute them on the server.
 - Avoid external persistence; cap and validate user-submitted content.
+- Camera analysis runs strictly on-device using MediaPipe Face Landmarker blendshapes and head pose. Never upload video, images, or raw landmarks to servers or third-party vision APIs (no Luxand).
+- Camera signals must be strictly observable and descriptive (gaze toward camera, head stability, brow movement variety, smile frequency, speaking cadence, blink rate, face visibility), calibrated against the user's first 3 seconds baseline.
+- Never infer emotion, nervousness, confidence, engagement, honesty, or personality from camera data.
+- Camera delivery insights must remain completely out of the 0–100 scoring system.
 
 <!-- BEGIN:nextjs-agent-rules -->
 

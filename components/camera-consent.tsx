@@ -218,9 +218,10 @@ export default function CameraConsent({ recording, onMetrics }: { recording: boo
         <div className="camera-consent-copy">
           <p className="camera-description">Before enabling the camera:</p>
           <ul>
-            <li>Delivery insights may examine face presence, gaze, expression, hand movement, shoulder alignment, and posture changes while you speak.</li>
-            <li>Video and facial landmarks stay on this device. Nothing is uploaded or saved.</li>
-            <li>This is optional. Speak mode works without the camera.</li>
+            <li>Delivery insights measure observable descriptive signals: gaze direction, head stability, brow movement variety, smile frequency, speaking cadence, blink rate, and face visibility.</li>
+            <li>No emotion, nervousness, or confidence inference is performed. We never judge your feelings or personality.</li>
+            <li>All camera frames and facial landmarks stay strictly on this device. No images, video, or face data are ever uploaded or saved.</li>
+            <li>This feature is completely optional and does not affect your 0–100 practice score.</li>
           </ul>
           <div className="camera-actions">
             <button className="camera-primary-button" type="button" onClick={enableCamera}>
@@ -244,9 +245,9 @@ export default function CameraConsent({ recording, onMetrics }: { recording: boo
               <p className="camera-description">Live preview and movement analysis stay on this device. No images or landmarks are saved.</p>
               {step === "preview" && !recording && <p className="camera-analysis-status" role="status">Camera is ready. Movement tracking begins when recording starts.</p>}
               {step === "preview" && recording && !analysisUnavailable && <p className="camera-analysis-status" role="status">
-                {!metrics?.calibrationComplete ? "For the first 3 seconds, keep a comfortable, neutral posture while calibration runs…" : metrics.lowConfidence
+                {!metrics?.calibrationComplete ? "For the first 3 seconds, look naturally at your screen while calibration establishes your baseline…" : metrics.lowConfidence
                   ? "Detection quality is low. Try brighter lighting and a clearer camera angle; measurements may be unreliable."
-                  : "On-device hand and posture tracking is active."}
+                  : "On-device camera analysis is active (observable cues only)."}
               </p>}
             </div>
             <button className="camera-secondary-button" type="button" onClick={() => { stopCamera(); setMessage("Camera is off."); }}>
