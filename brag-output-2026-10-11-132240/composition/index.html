@@ -1,0 +1,279 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Podium — one thought at a time</title>
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js" crossorigin="anonymous"></script>
+  <style>
+    :root { --paper:#faf8f3; --card:#fffefa; --ink:#25211e; --muted:#756e64; --line:#e9e3d8; --coral:#eb775f; --olive:#8d9951; --pale:#f6eee7; }
+    * { box-sizing:border-box; }
+    html,body { margin:0; width:1920px; height:1080px; overflow:hidden; background:var(--paper); color:var(--ink); }
+    body { font-family:Arial,Helvetica,sans-serif; -webkit-font-smoothing:antialiased; }
+    #main { position:relative; width:1920px; height:1080px; overflow:hidden; background:var(--paper); }
+    .scene { position:absolute; inset:0; width:1920px; height:1080px; padding:82px 126px; overflow:hidden; }
+    #scene1 { z-index:1; background:radial-gradient(ellipse at 79% 47%,#f3e9df 0,#faf8f3 42%,#faf8f3 74%); }
+    #scene2 { z-index:2; opacity:0; background:#f4efe7; }
+    #scene3 { z-index:3; opacity:0; background:#faf8f3; }
+    #scene4 { z-index:4; opacity:0; background:radial-gradient(ellipse at 50% 100%,#f1e8dc 0,#faf8f3 54%); }
+    .ambient { position:absolute; border-radius:50%; pointer-events:none; filter:blur(3px); }
+    .ambient.a { width:460px;height:460px;right:90px;top:150px;border:1px solid #d8cabb;opacity:.62; }
+    .ambient.b { width:330px;height:330px;right:155px;top:215px;border:1px solid #d8b6a6;opacity:.65; }
+    .brand { display:flex;align-items:center;gap:14px;font-weight:750;font-size:27px;letter-spacing:-1.5px; }
+    .mark { display:flex;align-items:end;gap:4px;width:34px;height:34px;padding:6px;border-radius:11px;background:var(--coral);box-shadow:0 8px 20px #c15f4d25; }
+    .mark i { display:block;width:4px;border-radius:8px;background:#fff8f1; }
+    .mark i:nth-child(1){height:11px}.mark i:nth-child(2){height:20px}.mark i:nth-child(3){height:15px}
+    .eyebrow { display:flex;align-items:center;gap:13px;color:#867e72;font-weight:700;font-size:16px;letter-spacing:.18em;text-transform:uppercase; }
+    .eyebrow:before { content:"";width:36px;height:2px;background:var(--coral); }
+    .headline { margin:26px 0 22px;font:400 104px/.99 Georgia,"Times New Roman",serif;letter-spacing:-5px; }
+    .headline em { color:var(--coral);font-weight:400; }
+    .subline { max-width:770px;margin:0;color:#655e55;font-size:27px;line-height:1.55; }
+    .hero-copy { position:relative;z-index:2;width:960px;padding-top:118px; }
+    .hero-bottom { display:flex;align-items:center;gap:12px;margin-top:32px;color:#777063;font-size:18px;letter-spacing:.02em; }
+    .spark { color:var(--olive);font-size:23px; }
+    .orbit { position:absolute;right:172px;top:204px;width:572px;height:572px;border:1px solid #ddd2c5;border-radius:50%; }
+    .orbit.inner { right:225px;top:257px;width:466px;height:466px;border-color:#e1c6b9; }
+    .orbit-dot { position:absolute;right:207px;top:263px;width:20px;height:20px;border-radius:50%;background:var(--olive);box-shadow:0 0 0 9px #8d99511c; }
+    .sound-core { position:absolute;right:307px;top:339px;display:grid;place-items:center;width:300px;height:300px;border-radius:50%;background:#fffaf2;box-shadow:0 22px 75px #b59c801e; }
+    .sound-core:before { content:"";position:absolute;inset:22px;border:1px solid #eee4d8;border-radius:50%; }
+    .wave { display:flex;align-items:center;gap:10px;height:112px; }
+    .wave i { width:9px;border-radius:9px;background:var(--coral);opacity:.9; }
+    .wave i:nth-child(1),.wave i:nth-child(9){height:30px}.wave i:nth-child(2),.wave i:nth-child(8){height:58px}.wave i:nth-child(3),.wave i:nth-child(7){height:86px}.wave i:nth-child(4),.wave i:nth-child(6){height:66px}.wave i:nth-child(5){height:104px}
+    .tiny-label { position:absolute;padding:13px 17px;border:1px solid #e5dbcf;border-radius:6px;background:#fffcf7d9;color:#766d61;font-size:13px;font-weight:700;letter-spacing:.11em; }
+    .tiny-label.one {right:106px;top:247px}.tiny-label.two {right:119px;bottom:240px}
+    .scene-head { display:flex;align-items:center;justify-content:space-between;margin-bottom:44px; }
+    .scene-head .brand { font-size:22px; }
+    .scene-index { color:#8f8679;font-size:14px;font-weight:700;letter-spacing:.13em; }
+    .setup-layout { display:grid;grid-template-columns:620px 1fr;gap:84px;align-items:center;height:790px; }
+    .section-title { margin:0 0 14px;font:400 60px/1.05 Georgia,"Times New Roman",serif;letter-spacing:-2px; }
+    .section-copy { margin:0 0 30px;color:#71695e;font-size:22px;line-height:1.5; }
+    .category-grid { display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:28px 0; }
+    .category { min-height:105px;padding:17px 13px;border:1px solid var(--line);border-radius:12px;background:var(--card);color:#574f45;font-size:15px;font-weight:600;line-height:1.35;box-shadow:0 6px 15px #44342008; }
+    .category b { display:block;margin-bottom:12px;color:var(--olive);font-size:21px; }
+    .category.selected { border-color:#dc8c79;background:#fff8f4;box-shadow:0 8px 25px #a7584114; }
+    .choice-row { display:flex;align-items:center;gap:12px;margin:15px 0; }
+    .choice-label { width:128px;color:#8a8175;font-size:14px;font-weight:700;letter-spacing:.08em;text-transform:uppercase; }
+    .choice { padding:11px 20px;border:1px solid #e7e1d6;border-radius:99px;background:#fffefa;color:#6b6258;font-size:16px;font-weight:600; }
+    .choice.active { border-color:#d5d4b6;background:#f0f1e5;color:#606a3b; }
+    .app-window { padding:20px;border:1px solid #e8e0d5;border-radius:17px;background:#fffefa;box-shadow:0 30px 80px #50371e14;transform:rotate(-1.1deg); }
+    .window-bar { display:flex;align-items:center;gap:7px;height:30px;border-bottom:1px solid #eee9e1;color:#aaa092;font-size:12px; }
+    .window-bar i { width:8px;height:8px;border-radius:50%;background:#e7d7c8; }
+    .window-label { margin-left:auto;letter-spacing:.1em; }
+    .topic-card { margin:25px 8px 7px;padding:26px 28px;border:1px solid #efdfd7;border-radius:12px;background:#fffaf7; }
+    .topic-meta { display:flex;align-items:center;justify-content:space-between;color:#9b8d7d;font-size:13px;font-weight:700;letter-spacing:.1em; }
+    .trend { padding:7px 10px;border-radius:99px;background:#eff0df;color:#667044;font-size:12px;letter-spacing:.02em; }
+    .topic-card h3 { margin:18px 0 17px;color:#38322d;font:400 34px/1.25 Georgia,"Times New Roman",serif; }
+    .topic-card p { margin:0;color:#8a8072;font-size:15px; }
+    .primary { display:flex;align-items:center;justify-content:space-between;margin:21px 8px 0;padding:16px 21px;border-radius:8px;background:var(--coral);color:#fffaf5;font-size:17px;font-weight:700; }
+    .practice-layout { display:grid;grid-template-columns:600px 1fr;gap:86px;align-items:center;height:790px; }
+    .practice-copy .section-title { max-width:530px; }
+    .micro-stats { display:flex;gap:12px;margin-top:28px; }
+    .stat { min-width:130px;padding:14px 16px;border:1px solid #e8e2d8;border-radius:10px;background:#fffefa; }
+    .stat small { display:block;color:#9b9285;font-size:12px;font-weight:700;letter-spacing:.1em; }
+    .stat strong { display:block;margin-top:8px;color:#312b26;font-size:25px;font-variant-numeric:tabular-nums; }
+    .session-window { padding:29px;border:1px solid #e6dfd5;border-radius:17px;background:#fffefa;box-shadow:0 30px 80px #50371e13; }
+    .session-top { display:flex;align-items:center;justify-content:space-between;padding-bottom:20px;border-bottom:1px solid #eee9e1; }
+    .session-top b { color:#8e7869;font-size:13px;letter-spacing:.12em; }
+    .recording { display:flex;align-items:center;gap:9px;color:#786f62;font-size:15px; }
+    .recording i { width:11px;height:11px;border-radius:50%;background:#d9705d;box-shadow:0 0 0 5px #d9705d1c; }
+    .session-question { margin:23px 0 8px;color:#a38d7f;font-size:13px;font-weight:700;letter-spacing:.1em; }
+    .session-window h3 { margin:0 0 17px;color:#38322d;font:400 31px/1.3 Georgia,"Times New Roman",serif; }
+    .transcript { min-height:190px;padding:20px 22px;border:1px solid #e7e0d4;border-radius:9px;background:#fdfbf7;color:#494239;font:21px/1.65 Georgia,"Times New Roman",serif; }
+    .cursor { display:inline-block;width:2px;height:23px;margin-left:4px;background:var(--coral);vertical-align:middle; }
+    .session-bottom { display:flex;align-items:center;justify-content:space-between;margin-top:18px;color:#8c8376;font-size:14px; }
+    .session-bottom strong { color:#657043;font-size:16px; }
+    .review-layout { display:grid;grid-template-columns:530px 1fr;gap:100px;align-items:center;height:790px; }
+    .review-copy .section-title { font-size:66px; }
+    .score-ring { position:relative;display:grid;place-items:center;width:210px;height:210px;margin:33px 0 0;border-radius:50%;background:conic-gradient(var(--coral) 0 86%,#eee8dd 86% 100%); }
+    .score-ring:before { content:"";position:absolute;inset:12px;border-radius:50%;background:#faf8f3; }
+    .score-value { z-index:1;color:#38322d;font:400 66px/1 Georgia,"Times New Roman",serif; }
+    .score-value small { display:block;margin-top:8px;color:#988e81;font:700 13px Arial,sans-serif;text-align:center;letter-spacing:.12em; }
+    .result-window { padding:31px 35px;border:1px solid #e6dfd5;border-radius:16px;background:#fffefa;box-shadow:0 28px 70px #50371e12; }
+    .result-title { margin:0 0 22px;color:#918779;font-size:14px;font-weight:700;letter-spacing:.14em; }
+    .score-bars { display:grid;grid-template-columns:1fr 1fr;gap:20px 26px;padding-bottom:25px;border-bottom:1px solid #eee9e1; }
+    .bar-label { display:flex;justify-content:space-between;margin-bottom:9px;color:#756c60;font-size:15px; }
+    .bar-label b { color:#413a33; }
+    .bar-track { height:8px;border-radius:99px;background:#eee9df;overflow:hidden; }
+    .bar-fill { height:100%;width:0;border-radius:99px;background:var(--olive); }
+    .feedback { margin-top:20px;padding:19px 21px;border:1px solid #e6e5d6;border-radius:10px;background:#f8f8ef; }
+    .feedback small { display:block;margin-bottom:7px;color:#848b5e;font-size:12px;font-weight:700;letter-spacing:.12em; }
+    .feedback p { margin:0;color:#4e4a3e;font:20px/1.45 Georgia,"Times New Roman",serif; }
+    .feedback p + small { margin-top:14px; }
+    .closing-line { margin-top:27px;color:#786f62;font-size:17px; }
+    .final-brand { position:absolute;right:150px;bottom:82px;display:flex;align-items:center;gap:15px;font-size:29px; }
+    .final-brand .mark { width:40px;height:40px; }
+    .final-tag { margin-left:17px;color:#8a8174;font-size:15px;letter-spacing:.08em; }
+    .footer-rule { position:absolute;right:125px;bottom:62px;left:125px;height:1px;background:#e6dfd4; }
+    .footnote { position:absolute;left:128px;bottom:84px;color:#92897d;font-size:14px;letter-spacing:.12em;text-transform:uppercase; }
+    /* Video-size text needs stronger contrast than some of the live web UI tokens. */
+    .eyebrow,.subline,.hero-bottom,.scene-index,.section-copy,.category,.choice-label,.choice,.window-bar,.topic-meta,.topic-card p,.stat small,.session-question,.session-top b,.recording,.session-bottom,.result-title,.bar-label,.closing-line,.footnote,.final-tag,.score-value small { color:#62594e; }
+    .hero-title em { color:#c85b45; }
+    .category b,.trend,.choice.active,.session-bottom strong,.bar-label b,.feedback small { color:#4e5b31; }
+    .session-bottom strong { color:#26311e; }
+    .primary { background:#b74332; }
+  </style>
+</head>
+<body>
+  <div id="main" data-composition-id="main" data-width="1920" data-height="1080" data-start="0" data-duration="20">
+    <section class="scene" id="scene1">
+      <div class="ambient a"></div><div class="ambient b"></div><div class="orbit"></div><div class="orbit inner"></div><div class="orbit-dot"></div>
+      <div class="sound-core"><div class="wave"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div>
+      <div class="tiny-label one">YOUR VOICE, YOUR PACE</div><div class="tiny-label two">ONE THOUGHT AT A TIME</div>
+      <div class="hero-copy">
+        <div class="brand hero-brand"><span class="mark"><i></i><i></i><i></i></span><span>podium</span></div>
+        <div class="eyebrow hero-eyebrow" style="margin-top:64px">YOUR SPACE TO PRACTICE</div>
+        <h1 class="headline hero-title">Find your<br/><em>voice.</em> Then<br/>make it heard.</h1>
+        <p class="subline hero-subtitle">Confidence grows with practice.<br/>One thought at a time.</p>
+        <div class="hero-bottom hero-note"><span class="spark">✳</span> No pressure. Just progress.</div>
+      </div>
+    </section>
+
+    <section class="scene" id="scene2">
+      <div class="scene-head s2-head"><div class="brand"><span class="mark"><i></i><i></i><i></i></span><span>podium</span></div><span class="scene-index">01 / CHOOSE A PROMPT</span></div>
+      <div class="setup-layout">
+        <div class="setup-copy">
+          <div class="eyebrow s2-eyebrow">START WHERE YOU ARE</div>
+          <h2 class="section-title s2-title">A prompt<br/>for today.</h2>
+          <p class="section-copy s2-copy">Pick a topic, choose your mode,<br/>and make the next few minutes yours.</p>
+          <div class="category-grid s2-categories">
+            <div class="category"><b>☀</b>Everyday life</div>
+            <div class="category selected"><b>↗</b>Career &amp;<br/>workplace</div>
+            <div class="category"><b>✳</b>Technology<br/>&amp; AI</div>
+          </div>
+          <div class="choice-row s2-mode"><span class="choice-label">Practice by</span><span class="choice active">Speaking</span><span class="choice">Writing</span></div>
+          <div class="choice-row s2-level"><span class="choice-label">Challenge</span><span class="choice">Easy</span><span class="choice active">Medium</span><span class="choice">Hard</span></div>
+        </div>
+        <div class="app-window s2-window">
+          <div class="window-bar"><i></i><i></i><i></i><span class="window-label">TODAY’S PRACTICE</span></div>
+          <div class="topic-card s2-topic">
+            <div class="topic-meta"><span>CAREER &amp; WORKPLACE</span><span class="trend">✦ CLASSIC</span></div>
+            <h3>What makes a<br/>good teammate?</h3>
+            <p>A thoughtful prompt, ready when you are.</p>
+          </div>
+          <div class="primary s2-button"><span>Get my topic</span><span>↗</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="scene" id="scene3">
+      <div class="scene-head s3-head"><div class="brand"><span class="mark"><i></i><i></i><i></i></span><span>podium</span></div><span class="scene-index">02 / PRACTICE IN THE MOMENT</span></div>
+      <div class="practice-layout">
+        <div class="practice-copy">
+          <div class="eyebrow s3-eyebrow">SPEAK OR WRITE</div>
+          <h2 class="section-title s3-title">Find your<br/>own words.</h2>
+          <p class="section-copy s3-copy">A gentle timer keeps you moving.<br/>Your pace is yours to set.</p>
+          <div class="micro-stats s3-stats"><div class="stat"><small>TIME</small><strong>00:42</strong></div><div class="stat"><small>WORDS</small><strong>38</strong></div><div class="stat"><small>PACE</small><strong>132 <small style="font-size:13px">wpm</small></strong></div></div>
+        </div>
+        <div class="session-window s3-window">
+          <div class="session-top"><b>YOUR TOPIC</b><span class="recording"><i></i> Listening</span></div>
+          <div class="session-question">CAREER &amp; WORKPLACE</div>
+          <h3>What makes a good teammate?</h3>
+          <div class="transcript s3-transcript">A good teammate listens carefully, shares context, and makes it easier for everyone to do their best work<span class="cursor"></span></div>
+          <div class="session-bottom"><span>Live transcript</span><strong>Recording · 00:42</strong></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="scene" id="scene4">
+      <div class="scene-head s4-head"><div class="brand"><span class="mark"><i></i><i></i><i></i></span><span>podium</span></div><span class="scene-index">03 / YOUR REVIEW</span></div>
+      <div class="review-layout">
+        <div class="review-copy">
+          <div class="eyebrow s4-eyebrow">A LITTLE PROGRESS</div>
+          <h2 class="section-title s4-title">Leave with<br/>a next step.</h2>
+          <p class="section-copy s4-copy">Useful feedback for the next<br/>time you speak or write.</p>
+          <div class="score-ring s4-ring"><div class="score-value">86<small>OUT OF 100</small></div></div>
+        </div>
+        <div class="result-window s4-window">
+          <p class="result-title">YOUR AI REVIEW · PRACTICE SCORE</p>
+          <div class="score-bars">
+            <div class="score-part"><div class="bar-label"><span>Length</span><b>34 / 40</b></div><div class="bar-track"><div class="bar-fill" data-width="85%"></div></div></div>
+            <div class="score-part"><div class="bar-label"><span>Vocabulary</span><b>21 / 25</b></div><div class="bar-track"><div class="bar-fill" data-width="84%"></div></div></div>
+            <div class="score-part"><div class="bar-label"><span>Clarity</span><b>18 / 20</b></div><div class="bar-track"><div class="bar-fill" data-width="90%"></div></div></div>
+            <div class="score-part"><div class="bar-label"><span>Pace</span><b>13 / 15</b></div><div class="bar-track"><div class="bar-fill" data-width="86%"></div></div></div>
+          </div>
+          <div class="feedback s4-feedback"><small>WHAT WORKED</small><p>Clear opening and a useful example.</p><small>TRY NEXT</small><p>Give your closing sentence a little more room.</p></div>
+          <p class="closing-line s4-closing">Every small rep is a step forward.</p>
+        </div>
+      </div>
+      <div class="footer-rule s4-rule"></div>
+      <div class="footnote s4-footnote">NO PRESSURE. JUST PROGRESS.</div>
+      <div class="final-brand s4-brand"><span class="mark"><i></i><i></i><i></i></span><b>podium</b><span class="final-tag">One thought at a time.</span></div>
+    </section>
+    <audio id="music" data-start="0" data-duration="20" data-track-index="10" data-volume="0.28" src="assets/music/podium-launch-bed.mp3"></audio>
+    <audio id="sfx-topic" data-start="6.28" data-duration="0.10" data-track-index="11" data-volume="0.58" src="assets/sfx/click_001.ogg"></audio>
+    <audio id="sfx-transcript" data-start="10.53" data-duration="0.11" data-track-index="12" data-volume="0.48" src="assets/sfx/drop_001.ogg"></audio>
+    <audio id="sfx-score" data-start="15.82" data-duration="0.19" data-track-index="13" data-volume="0.58" src="assets/sfx/drop_002.ogg"></audio>
+  </div>
+  <script src="assets/music/audio-data.js"></script>
+  <script>
+    window.__timelines = window.__timelines || {};
+    const tl = gsap.timeline({ paused:true });
+    // Subtle, deterministic bass response on the existing halo and result-card depth.
+    const audioData = window.__PODIUM_AUDIO_DATA;
+    for (var f = 0; f < audioData.totalFrames; f++) {
+      const frame = audioData.frames[f];
+      tl.call(function (sample) {
+        return function () {
+          gsap.set(".ambient.a", { scale: 1 + sample.bands[0] * .035 });
+          gsap.set(".s4-window", { boxShadow: "0 28px 70px rgba(80,55,30," + (0.07 + sample.bands[5] * .035) + ")" });
+        };
+      }(frame), [], f / audioData.fps);
+    }
+    // Scene 1: editorial hero, then a persistent paper-soft drift.
+    tl.from(".hero-brand",{y:22,opacity:0,duration:.55,ease:"power3.out"},.18);
+    tl.from(".hero-eyebrow",{x:-34,opacity:0,duration:.48,ease:"power2.out"},.42);
+    tl.from(".hero-title",{y:40,opacity:0,duration:.78,ease:"expo.out"},.58);
+    tl.from(".hero-subtitle",{y:20,opacity:0,duration:.52,ease:"sine.out"},1.12);
+    tl.from(".hero-note",{x:-15,opacity:0,duration:.42,ease:"power3.out"},1.55);
+    tl.from(".sound-core",{scale:.84,opacity:0,duration:.78,ease:"back.out(1.25)"},.42);
+    tl.from(".orbit",{scale:.87,opacity:0,duration:.9,ease:"power2.out",stagger:.12},.32);
+    tl.from(".tiny-label",{y:12,opacity:0,duration:.4,ease:"power2.out",stagger:.16},1.35);
+    tl.to(".orbit.inner",{rotation:7,duration:3.1,ease:"sine.inOut"},1.1);
+    // Soft push/crossfade at 4.35s; scene 2 enters already composed from CSS layout.
+    tl.to("#scene1",{opacity:0,x:-22,duration:.48,ease:"power2.inOut"},4.35);
+    tl.fromTo("#scene2",{opacity:0,x:28},{opacity:1,x:0,duration:.48,ease:"power2.inOut"},4.35);
+    tl.from(".s2-head",{y:16,opacity:0,duration:.44,ease:"power3.out"},4.52);
+    tl.from(".s2-eyebrow",{x:-26,opacity:0,duration:.4,ease:"power2.out"},4.66);
+    tl.from(".s2-title",{y:32,opacity:0,duration:.62,ease:"expo.out"},4.78);
+    tl.from(".s2-copy",{y:18,opacity:0,duration:.42,ease:"sine.out"},5.12);
+    tl.from(".s2-categories .category",{y:18,opacity:0,duration:.38,ease:"power3.out",stagger:.12},5.28);
+    tl.from(".s2-mode",{x:-20,opacity:0,duration:.4,ease:"power2.out"},5.72);
+    tl.from(".s2-level",{x:20,opacity:0,duration:.4,ease:"sine.out"},5.85);
+    tl.from(".s2-window",{x:35,rotation:1.5,opacity:0,duration:.72,ease:"power3.out"},4.72);
+    tl.from(".s2-topic",{y:20,opacity:0,duration:.54,ease:"back.out(1.12)"},5.35);
+    tl.from(".s2-button",{y:12,opacity:0,duration:.38,ease:"power2.out"},6.3);
+    // Scene 3 arrives through a gentle blur-like dissolve/push.
+    tl.to("#scene2",{opacity:0,x:-18,duration:.5,ease:"sine.inOut"},9.35);
+    tl.fromTo("#scene3",{opacity:0,x:20},{opacity:1,x:0,duration:.5,ease:"sine.inOut"},9.35);
+    tl.from(".s3-head",{y:14,opacity:0,duration:.42,ease:"power3.out"},9.93);
+    tl.from(".s3-eyebrow",{x:-23,opacity:0,duration:.4,ease:"power2.out"},9.67);
+    tl.from(".s3-title",{y:30,opacity:0,duration:.6,ease:"expo.out"},9.8);
+    tl.from(".s3-copy",{opacity:0,duration:.54,ease:"sine.out"},10.14);
+    tl.from(".s3-stats .stat",{y:18,scale:.96,opacity:0,duration:.4,ease:"back.out(1.1)",stagger:.13},10.46);
+    tl.from(".s3-window",{x:38,opacity:0,duration:.7,ease:"power3.out"},9.7);
+    tl.from(".session-top",{y:12,opacity:0,duration:.4,ease:"power2.out"},10.02);
+    tl.from(".session-question,.session-window h3",{y:12,opacity:0,duration:.4,ease:"sine.out",stagger:.15},10.18);
+    tl.from(".transcript",{y:16,opacity:0,duration:.48,ease:"power3.out"},10.55);
+    tl.from(".session-bottom",{opacity:0,duration:.38,ease:"power2.out"},11.02);
+    tl.to(".cursor",{opacity:.2,duration:.42,ease:"sine.inOut",repeat:5,yoyo:true},11.2);
+    // Results reveal: score and feedback arrive, then settle under the end card.
+    tl.to("#scene3",{opacity:0,x:-18,duration:.5,ease:"power2.inOut"},14.8);
+    tl.fromTo("#scene4",{opacity:0,x:22},{opacity:1,x:0,duration:.5,ease:"power2.inOut"},14.8);
+    tl.from(".s4-head",{y:14,opacity:0,duration:.42,ease:"power3.out"},15.38);
+    tl.from(".s4-eyebrow",{x:-22,opacity:0,duration:.4,ease:"power2.out"},15.12);
+    tl.from(".s4-title",{y:32,opacity:0,duration:.62,ease:"expo.out"},15.25);
+    tl.from(".s4-copy",{y:16,opacity:0,duration:.4,ease:"sine.out"},15.62);
+    tl.from(".s4-ring",{scale:.78,rotation:-24,opacity:0,duration:.72,ease:"back.out(1.15)"},15.82);
+    tl.from(".s4-window",{x:34,opacity:0,duration:.66,ease:"power3.out"},15.05);
+    tl.from(".result-title",{x:-12,opacity:0,duration:.38,ease:"power2.out"},15.42);
+    tl.from(".score-part",{y:12,opacity:0,duration:.36,ease:"sine.out",stagger:.1},15.66);
+    tl.to(".bar-fill",{width:(i,el)=>el.dataset.width,duration:.56,ease:"power2.out",stagger:.08},15.85);
+    tl.from(".s4-feedback",{y:18,opacity:0,duration:.52,ease:"back.out(1.08)"},16.35);
+    tl.from(".s4-closing",{opacity:0,duration:.4,ease:"sine.out"},17.02);
+    tl.from(".s4-rule",{scaleX:0,transformOrigin:"left center",duration:.58,ease:"power2.out"},17.4);
+    tl.from(".s4-footnote",{y:8,opacity:0,duration:.36,ease:"power3.out"},17.55);
+    tl.from(".s4-brand",{y:14,opacity:0,duration:.48,ease:"expo.out"},17.47);
+    window.__timelines["main"] = tl;
+  </script>
+</body>
+</html>

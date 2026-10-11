@@ -1,0 +1,1 @@
+Podium turns a few quiet minutes into a speaking or writing practice loop: choose a prompt, try it, and leave with useful feedback.

@@ -13,9 +13,29 @@ type Tasks = {
   pose: import("@mediapipe/tasks-vision").PoseLandmarker;
 };
 type Point = { x: number; y: number };
+type Blendshape = { categoryName?: string; score?: number };
 
 function average(values: number[]) {
   return values.length ? values.reduce((total, value) => total + value, 0) / values.length : 0;
+}
+
+function blendshapeScore(categories: Blendshape[] | undefined, names: string[]) {
+  const values = new Map((categories ?? []).map((entry) => [entry.categoryName, entry.score ?? 0]));
+  return average(names.map((name) => values.get(name) ?? 0));
+}
+
+function largestFaceIndex(faces: Array<Array<{ x: number; y: number }>> | undefined) {
+  if (!faces?.length) return -1;
+  return faces.reduce((largest, face, index) => {
+    const bounds = (points: Array<{ x: number; y: number }>) => (Math.max(...points.map((point) => point.x)) - Math.min(...points.map((point) => point.x))) * (Math.max(...points.map((point) => point.y)) - Math.min(...points.map((point) => point.y)));
+    return bounds(face) > bounds(faces[largest]) ? index : largest;
+  }, 0);
+}
+
+function headPose(matrix: unknown) {
+  const values = matrix && typeof matrix === "object" && "data" in matrix ? Array.from((matrix as { data: ArrayLike<number> }).data) : [];
+  if (values.length < 16) return { yaw: 0, pitch: 0, roll: 0 };
+  return { yaw: Math.atan2(values[8], values[10]), pitch: Math.atan2(-values[9], Math.hypot(values[8], values[10])), roll: Math.atan2(values[4], values[0]) };
 }
 
 function closeTasks(tasks: Partial<Tasks>) {
@@ -30,7 +50,7 @@ async function createTasks(vision: MediaPipeModule, fileset: Awaited<ReturnType<
     tasks.face = await vision.FaceLandmarker.createFromOptions(fileset, {
       baseOptions: { modelAssetPath: FACE_MODEL, delegate },
       runningMode: "VIDEO",
-      numFaces: 1,
+      numFaces: 3,
       outputFaceBlendshapes: true,
       outputFacialTransformationMatrixes: true,
     });
@@ -129,6 +149,14 @@ export class MediaPipeDeliveryTracker implements DeliveryTracker {
     const faceResult = this.tasks.face.detectForVideo(video, timestamp);
     const handResult = this.tasks.hands.detectForVideo(video, timestamp);
     const poseResult = this.tasks.pose.detectForVideo(video, timestamp);
+    const faceIndex = largestFaceIndex(faceResult.faceLandmarks);
+    const blendshapes = faceIndex >= 0 ? faceResult.faceBlendshapes?.[faceIndex]?.categories as Blendshape[] | undefined : undefined;
+    const facePose = headPose(faceIndex >= 0 ? faceResult.facialTransformationMatrixes?.[faceIndex] : undefined);
+    const eyeDirection = blendshapeScore(blendshapes, ["eyeLookInLeft", "eyeLookOutLeft", "eyeLookUpLeft", "eyeLookDownLeft", "eyeLookInRight", "eyeLookOutRight", "eyeLookUpRight", "eyeLookDownRight"]);
+    const browMovement = blendshapeScore(blendshapes, ["browInnerUp", "browDownLeft", "browDownRight", "browOuterUpLeft", "browOuterUpRight"]);
+    const smileAmount = blendshapeScore(blendshapes, ["mouthSmileLeft", "mouthSmileRight"]);
+    const mouthActivity = blendshapeScore(blendshapes, ["jawOpen", "mouthFunnel", "mouthPucker", "mouthPressLeft", "mouthPressRight"]);
+    const blinkAmount = blendshapeScore(blendshapes, ["eyeBlinkLeft", "eyeBlinkRight"]);
 
     const wrists = (handResult.landmarks ?? []).flatMap((landmarks) => {
       const wrist = landmarks[0];
@@ -164,7 +192,16 @@ export class MediaPipeDeliveryTracker implements DeliveryTracker {
 
     return {
       timestamp,
-      facePresent: (faceResult.faceLandmarks?.length ?? 0) > 0,
+      facePresent: faceIndex >= 0,
+      faceConfidence: faceIndex >= 0 ? 1 : 0,
+      eyeDirection,
+      headYaw: facePose.yaw,
+      headPitch: facePose.pitch,
+      headRoll: facePose.roll,
+      browMovement,
+      smileAmount,
+      mouthActivity,
+      blinkAmount,
       handsPresent: wrists.length > 0,
       handConfidence,
       handDeltaX,
