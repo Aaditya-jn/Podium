@@ -30,6 +30,12 @@
 - Camera signals must be strictly observable and descriptive (gaze toward camera, head stability, brow movement variety, smile frequency, speaking cadence, blink rate, face visibility), calibrated against the user's first 3 seconds baseline.
 - Never infer emotion, nervousness, confidence, engagement, honesty, or personality from camera data.
 - Camera delivery insights must remain completely out of the 0–100 scoring system.
+- Voice delivery analysis runs strictly on-device with the Web Audio API (`AnalyserNode`). Never record, store, upload, or retain audio or raw samples for this feature; only running aggregate numbers may be kept. Reuse an existing microphone stream when one is active, and request microphone permission only when recording starts.
+- Voice analysis must stop its own microphone tracks and close the AudioContext on pause, submit, tab hide, page leave and unmount. The separate, consent-gated MediaRecorder transcription fallback keeps its own lifecycle.
+- Voice signals are observable only: pause timing and silence, relative volume variation and trailing off, pitch range/variation, words-per-minute pace, and approximate filler counts. Calibrate the noise floor against the user's first 2–3 seconds.
+- Never infer emotion, nervousness, confidence, honesty, or personality from voice data, and never label pitch or volume as an emotion. Note that microphones, background noise and accents affect measurements, and show "Not enough data" for short or low-quality sessions.
+- Voice delivery insights must remain completely out of the 0–100 scoring system. The voice consent panel must offer per-signal opt-outs (pauses, volume, pitch, pace, fillers).
+- Keep pure pause detection, noise-floor calibration, pitch estimation, filler counting and aggregation in `lib/audio/` and cover them with synthetic-signal unit tests.
 
 <!-- BEGIN:nextjs-agent-rules -->
 

@@ -141,6 +141,21 @@ h1 { margin:0; font-family: Georgia, 'Times New Roman', serif; font-size:clamp(3
 .delivery-not-enough-data { padding:14px; border-radius:8px; background:#f5f2e9; margin:10px 0 12px; }
 .delivery-not-enough-data p { margin:0 0 4px; color:#5a5347; font-size:11px; font-weight:600; }
 .delivery-not-enough-data small { color:#857c70; font-size:9px; }
+.delivery-not-enough-data.compact { margin:0 0 12px; padding:10px 12px; }
+.delivery-group { margin-bottom:14px; }
+.delivery-group-heading { display:flex; align-items:center; justify-content:space-between; gap:10px; margin:12px 0 8px; }
+.delivery-group-heading h4 { margin:0; color:var(--ink); font:400 15px Georgia,'Times New Roman',serif; }
+.voice-metrics-grid { grid-template-columns:repeat(3,1fr); }
+.voice-warning { margin:0 0 10px; padding:8px 11px; border-radius:7px; background:#f8efdc; color:#7d5a23; font-size:9px; line-height:1.5; }
+.voice-signal-fieldset { margin-top:12px; padding:10px 12px; border:1px solid #e7e0d3; border-radius:8px; }
+.voice-signal-fieldset legend { padding:0 4px; color:#5f574c; font-size:9px; font-weight:700; }
+.voice-signal-toggle { display:flex; align-items:flex-start; gap:8px; padding:5px 0; color:#625b51; font-size:10px; line-height:1.45; cursor:pointer; }
+.voice-signal-toggle input { margin-top:2px; accent-color:var(--coral); }
+.voice-signal-toggle span { display:flex; flex-direction:column; gap:1px; }
+.voice-signal-toggle small { color:#8b8376; font-size:8px; line-height:1.4; }
+.voice-signal-summary { display:flex; flex-wrap:wrap; gap:6px; margin:8px 0; }
+.voice-signal-toggle.compact { display:inline-flex; align-items:center; padding:4px 8px; border-radius:99px; background:#f1efe6; }
+.voice-consent-note,.voice-live-note { margin:8px 0 0; color:#8b8376; font-size:9px; line-height:1.5; }
 
 /* Help improve Podium / Telemetry Groundwork UI */
 .improvement-section { margin-top:18px; padding:16px 18px; border:1px solid #e6e2d6; border-radius:10px; background:#faf9f4; }
@@ -177,6 +192,7 @@ h1 { margin:0; font-family: Georgia, 'Times New Roman', serif; font-size:clamp(3
 
 @media (max-width:760px) {
   .delivery-metrics-grid { grid-template-columns:repeat(2,1fr); }
+  .voice-metrics-grid { grid-template-columns:repeat(2,1fr); }
   .timeline-grid { grid-template-columns:repeat(2,1fr); }
   .coaching-columns { grid-template-columns:1fr; }
 }
@@ -194,6 +210,15 @@ h1 { margin:0; font-family: Georgia, 'Times New Roman', serif; font-size:clamp(3
   .coaching-strength-card p { color:#e5ecd0; }
   .coaching-block h5 { color:#d8cebf; }
   .coaching-block ul { color:#bbb2a3; }
+  .delivery-group-heading h4 { color:#f0e6dc; }
+  .voice-signal-fieldset { border-color:#4a473e; }
+  .voice-signal-fieldset legend { color:#ddd4c5; }
+  .voice-signal-toggle { color:#d0c7b8; }
+  .voice-signal-toggle small { color:#b3ab9d; }
+  .voice-signal-toggle.compact { background:#333329; }
+  .voice-consent-note,.voice-live-note { color:#b3ab9d; }
+  .voice-warning { background:#3d3221; color:#f0d29a; }
+  .delivery-status-pill.neutral { background:#3a3831; color:#cfc6b8; }
   .delivery-not-enough-data { background:#2d2c26; }
   .delivery-not-enough-data p { color:#e4ded2; }
   .improvement-section { border-color:#434037; background:#24231f; }

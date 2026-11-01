@@ -4,9 +4,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import CameraConsent from "@/components/camera-consent";
 import ProtectedTextarea from "@/components/protected-textarea";
+import VoiceConsent, { type VoiceConsentHandle } from "@/components/voice-consent";
 import { attachRecognitionRecovery, detectSpeechEnvironment, type SpeechEngineLike } from "@/lib/speech/recovery";
 import { MAX_SPEECH_AUDIO_BYTES, MAX_SPEECH_AUDIO_DURATION_MS } from "@/lib/speech/limits";
 import type { TypingTelemetry } from "@/lib/scoring";
+import type { VoiceMetrics } from "@/lib/audio/types";
 import type { GesturePostureMetrics } from "@/lib/vision/aggregation";
 
 type Mode = "speak" | "write";
@@ -22,6 +24,7 @@ export type AttemptResult = {
   reviewFallback?: boolean;
   transcriptionSource?: "audio-fallback";
   deliveryInsights?: GesturePostureMetrics;
+  voiceInsights?: VoiceMetrics;
   deliveryCoaching?: {
     observations: string[];
     exercises: string[];
@@ -57,6 +60,8 @@ export default function PracticeSession({ topic, mode, onBack, onComplete, onShu
   const [submitting, setSubmitting] = useState(false);
   const [delivery, setDelivery] = useState<GesturePostureMetrics | undefined>();
   const [cameraEnabled, setCameraEnabled] = useState(false);
+  const [voicePanelOpen, setVoicePanelOpen] = useState(false);
+  const [captureStream, setCaptureStream] = useState<MediaStream | null>(null);
   const [speechCompatibility, setSpeechCompatibility] = useState("");
   const [speechLikelyUnsupported, setSpeechLikelyUnsupported] = useState(false);
   const [fallbackAvailable, setFallbackAvailable] = useState(false);
@@ -88,8 +93,13 @@ export default function PracticeSession({ topic, mode, onBack, onComplete, onShu
   const audioBlobRef = useRef<Blob | null>(null);
   const audioStopWaitersRef = useRef<Array<(blob: Blob | null) => void>>([]);
   const audioTranscribedRef = useRef(false);
+  const voiceConsentRef = useRef<VoiceConsentHandle | null>(null);
+  const voiceMetricsRef = useRef<VoiceMetrics | undefined>(undefined);
 
   const onDelivery = useCallback((metrics: GesturePostureMetrics) => setDelivery(metrics), []);
+  const onVoiceMetrics = useCallback((metrics: VoiceMetrics | undefined) => {
+    voiceMetricsRef.current = metrics;
+  }, []);
   const wordCount = countWords(text + (interim ? ` ${interim}` : ""));
   const pace = elapsed > 0 ? Math.round(wordCount / elapsed * 60) : 0;
 
@@ -121,7 +131,7 @@ export default function PracticeSession({ topic, mode, onBack, onComplete, onShu
     audioBytesRef.current = 0;
     audioTooLargeRef.current = false;
     audioBlobRef.current = null;
-    if (mountedRef.current) setAudioBlob(null);
+    if (mountedRef.current) { setAudioBlob(null); setCaptureStream(null); }
     const stream = mediaStreamRef.current;
     mediaStreamRef.current = null;
     stream?.getTracks().forEach((track) => track.stop());
@@ -140,6 +150,7 @@ export default function PracticeSession({ topic, mode, onBack, onComplete, onShu
 
   const pause = useCallback(() => {
     if (!recordingRef.current) return;
+    voiceConsentRef.current?.stop();
     if (startedAtRef.current !== null) elapsedBeforeRef.current += (Date.now() - startedAtRef.current) / 1000;
     startedAtRef.current = null;
     setElapsed(elapsedBeforeRef.current);
@@ -221,6 +232,7 @@ export default function PracticeSession({ topic, mode, onBack, onComplete, onShu
         clearAudioMemory();
         mediaStreamRef.current = stream;
         mediaRecorderRef.current = recorder;
+        setCaptureStream(stream);
         audioTranscribedRef.current = false;
         setAudioTranscribed(false);
         captureModeRef.current = "audio";
@@ -253,6 +265,7 @@ export default function PracticeSession({ topic, mode, onBack, onComplete, onShu
           mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
           mediaStreamRef.current = null;
           mediaRecorderRef.current = null;
+          if (mountedRef.current) setCaptureStream(null);
           if (blob && blob.size <= MAX_SPEECH_AUDIO_BYTES) {
             audioBlobRef.current = blob;
             if (mountedRef.current) { setAudioBlob(blob); setAudioStatus("Recording ready. Finish to send it for transcription."); }
@@ -417,21 +430,27 @@ export default function PracticeSession({ topic, mode, onBack, onComplete, onShu
       const reviewData = await reviewed.json();
 
       let deliveryCoachingResult: AttemptResult["deliveryCoaching"];
-      if (mode === "speak" && delivery && !delivery.notEnoughData) {
+      const cameraUsable = Boolean(delivery && !delivery.notEnoughData);
+      const voiceMetrics = voiceMetricsRef.current;
+      const voiceUsable = Boolean(voiceMetrics && !voiceMetrics.notEnoughData);
+      if (mode === "speak" && (cameraUsable || voiceUsable)) {
         try {
           const deliveryRes = await fetch("/api/delivery-review", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              durationSeconds: delivery.durationSeconds,
-              facePresencePercent: delivery.facePresencePercent,
-              gazeTowardCameraPercent: delivery.gazeTowardCameraPercent,
-              headStabilityPercent: delivery.headStabilityPercent,
-              browMovementVariety: delivery.browMovementVariety,
-              smileFrequencyPerMinute: delivery.smileFrequencyPerMinute,
-              mouthActivity: delivery.mouthActivity,
-              blinkRatePerMinute: delivery.blinkRatePerMinute,
-              segments: delivery.segments,
+              durationSeconds: delivery && cameraUsable ? delivery.durationSeconds : voiceMetrics?.durationSeconds ?? 0,
+              ...(delivery && cameraUsable ? {
+                facePresencePercent: delivery.facePresencePercent,
+                gazeTowardCameraPercent: delivery.gazeTowardCameraPercent,
+                headStabilityPercent: delivery.headStabilityPercent,
+                browMovementVariety: delivery.browMovementVariety,
+                smileFrequencyPerMinute: delivery.smileFrequencyPerMinute,
+                mouthActivity: delivery.mouthActivity,
+                blinkRatePerMinute: delivery.blinkRatePerMinute,
+                segments: delivery.segments,
+              } : {}),
+              ...(voiceMetrics && voiceUsable ? { voice: voiceMetrics } : {}),
             }),
           });
           if (deliveryRes.ok) {
@@ -454,6 +473,7 @@ export default function PracticeSession({ topic, mode, onBack, onComplete, onShu
         text: content, review: reviewData.review, reviewFallback: Boolean(reviewData.fallback),
         transcriptionSource: audioFallbackMode ? "audio-fallback" : undefined,
         deliveryInsights: mode === "speak" ? delivery : undefined,
+        voiceInsights: mode === "speak" ? voiceMetricsRef.current : undefined,
         deliveryCoaching: deliveryCoachingResult,
       };
       clearAudioMemory();
@@ -482,7 +502,12 @@ export default function PracticeSession({ topic, mode, onBack, onComplete, onShu
       {mode === "speak" && speechCompatibility && <p className="speech-compatibility" role="status">{speechCompatibility}</p>}
       {mode === "speak" && fallbackConsentOpen && <div className="audio-consent" role="region" aria-labelledby="audio-consent-title"><h3 id="audio-consent-title">Audio transcription consent</h3><p>Podium will record audio in this tab and send it to Google Gemini for transcription when you finish. The recording is held temporarily in memory, is not saved to Podium or a database, and is deleted after the transcription request. Maximum recording: 2 minutes or 8 MB.</p><div className="camera-actions"><button className="camera-primary-button" type="button" onClick={startAudioFallback}>I understand — start audio recording</button><button className="camera-secondary-button" type="button" onClick={() => setFallbackConsentOpen(false)}>Cancel</button></div></div>}
       {mode === "speak" && fallbackAvailable && (speechLikelyUnsupported || recognitionFailed || restartCapped) && !fallbackConsentOpen && <button className="camera-secondary-button fallback-open-button" type="button" onClick={() => setFallbackConsentOpen(true)}>Set up audio transcription</button>}
-      {mode === "speak" && <div className="camera-session-area"><div className="camera-optional-toggle"><button className="camera-secondary-button" type="button" onClick={() => setCameraEnabled((value) => !value)} aria-expanded={cameraEnabled}>{cameraEnabled ? "Hide camera options" : "Optional delivery insights"}</button><p>Face and posture measures stay on this device and do not affect your score.</p></div>{cameraEnabled && <CameraConsent recording={recording} onMetrics={onDelivery} />}</div>}
+      {mode === "speak" && <div className="camera-session-area">
+        <div className="camera-optional-toggle"><button className="camera-secondary-button" type="button" onClick={() => setCameraEnabled((value) => !value)} aria-expanded={cameraEnabled}>{cameraEnabled ? "Hide camera options" : "Camera delivery insights"}</button><p>Face and posture measures stay on this device and do not affect your score.</p></div>
+        {cameraEnabled && <CameraConsent recording={recording} onMetrics={onDelivery} />}
+        <div className="camera-optional-toggle"><button className="camera-secondary-button" type="button" onClick={() => setVoicePanelOpen((value) => !value)} aria-expanded={voicePanelOpen}>{voicePanelOpen ? "Hide voice options" : "Voice delivery insights"}</button><p>Live voice measures are computed on this device; audio is never recorded or uploaded for this feature.</p></div>
+        {voicePanelOpen && <VoiceConsent ref={voiceConsentRef} recording={recording} transcript={text} sharedStream={captureStream} onMetrics={onVoiceMetrics} />}
+      </div>}
 
       <div className="session-controls">
         {!recording ? <button className="start-button" type="button" onClick={start} disabled={submitting || transcribing || (mode === "speak" && speechLikelyUnsupported && !fallbackAvailable) || Boolean(audioBlob && audioRecording && !audioTranscribed)}><span>{audioBlob && audioRecording ? "Recording ready — finish to transcribe" : audioRecording ? elapsed > 0 ? "Resume audio" : "Start audio" : speechLikelyUnsupported && mode === "speak" ? "Set up audio transcription" : elapsed > 0 ? "Resume" : mode === "speak" ? "Start recording" : "Start writing"}</span><span className="button-arrow">↗</span></button> : <button className="camera-secondary-button pause-button" type="button" onClick={pause}>Pause</button>}

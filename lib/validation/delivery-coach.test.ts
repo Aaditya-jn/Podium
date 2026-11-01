@@ -2,10 +2,12 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildDeliveryCoachingPrompt,
+  deliveryCoachInputSchema,
   deliveryCoachingSchema,
   fallbackDeliveryCoaching,
   requestDeliveryCoachingWithFallback,
   type DeliveryCoachInput,
+  type VoiceAggregatesInput,
 } from "@/lib/validation/delivery-coach";
 
 const sampleInput: DeliveryCoachInput = {
@@ -61,7 +63,78 @@ const sampleInput: DeliveryCoachInput = {
   ],
 };
 
+const voiceSample: VoiceAggregatesInput = {
+  durationSeconds: 60,
+  analyzedSeconds: 57.5,
+  calibrationComplete: true,
+  noiseFloorDbfs: -47,
+  speechLevelDbfs: -21,
+  speechToNoiseDb: 26,
+  tooQuiet: false,
+  lowConfidence: false,
+  notEnoughData: false,
+  signals: { pauses: true, volume: true, pitch: true, pace: true, fillers: true },
+  pauseCount: 6,
+  shortPauseCount: 4,
+  longPauseCount: 1,
+  averagePauseSeconds: 0.9,
+  longestPauseSeconds: 4.1,
+  silentPercent: 18,
+  meanVolumeDbRelative: -2.1,
+  volumeVariationDb: 6.2,
+  trailingOffCount: 2,
+  trailingOffRatio: 33,
+  pitchMedianHz: 165,
+  pitchRangeSemitones: 8.4,
+  pitchVariationSemitones: 2.1,
+  pitchVariety: "some variation" as const,
+  voicedFramePercent: 62,
+  wordsPerMinute: 148,
+  speechActivityPercent: 72,
+  paceTrend: "faster" as const,
+  fillerCount: 9,
+  fillerRatePerMinute: 9.4,
+  fillerCountApproximate: true as const,
+  segments: [
+    { label: "Part 1", analyzedSeconds: 14.4, pauseCount: 1, shortPauseCount: 1, longPauseCount: 0, silentPercent: 12, meanVolumeDbRelative: -1.2, volumeVariationDb: 4.1, trailingOffCount: 0, pitchVarietySemitones: 1.8, pitchMedianHz: 160, paceWpm: 132, paceFlag: null, speechActivityPercent: 78, fillerCount: 1, fillerRatePerMinute: 4.2 },
+    { label: "Part 2", analyzedSeconds: 14.4, pauseCount: 2, shortPauseCount: 1, longPauseCount: 0, silentPercent: 16, meanVolumeDbRelative: -2.0, volumeVariationDb: 5.8, trailingOffCount: 1, pitchVarietySemitones: 2.0, pitchMedianHz: 163, paceWpm: 145, paceFlag: null, speechActivityPercent: 73, fillerCount: 2, fillerRatePerMinute: 8.3 },
+    { label: "Part 3", analyzedSeconds: 14.4, pauseCount: 2, shortPauseCount: 1, longPauseCount: 1, silentPercent: 24, meanVolumeDbRelative: -2.7, volumeVariationDb: 7.1, trailingOffCount: 1, pitchVarietySemitones: 2.3, pitchMedianHz: 168, paceWpm: 151, paceFlag: "faster", speechActivityPercent: 68, fillerCount: 3, fillerRatePerMinute: 12.5 },
+    { label: "Part 4", analyzedSeconds: 14.3, pauseCount: 1, shortPauseCount: 1, longPauseCount: 0, silentPercent: 20, meanVolumeDbRelative: -2.5, volumeVariationDb: 8.0, trailingOffCount: 0, pitchVarietySemitones: 2.4, pitchMedianHz: 170, paceWpm: 168, paceFlag: "faster", speechActivityPercent: 69, fillerCount: 3, fillerRatePerMinute: 12.6 },
+  ],
+};
+
 describe("delivery coaching validation and fallback", () => {
+  it("accepts voice-only aggregates and rejects empty delivery input", () => {
+    expect(deliveryCoachInputSchema.safeParse({ durationSeconds: 60, voice: voiceSample }).success).toBe(true);
+    expect(deliveryCoachInputSchema.safeParse({ durationSeconds: 60 }).success).toBe(false);
+  });
+
+  it("builds a voice prompt with numbers and explicit approximate-filler wording", () => {
+    const prompt = buildDeliveryCoachingPrompt({ durationSeconds: 60, voice: voiceSample });
+    expect(prompt).toContain("VOICE METRICS");
+    expect(prompt).toContain("4.1");
+    expect(prompt).toContain("168");
+    expect(prompt).toContain("APPROXIMATE");
+    expect(prompt).not.toContain("CAMERA METRICS");
+    expect(prompt).toContain("Do not label pitch or volume as an emotion");
+  });
+
+  it("provides a voice-only rule-based fallback citing numbers", () => {
+    const fallback = fallbackDeliveryCoaching({ durationSeconds: 60, voice: voiceSample });
+    expect(deliveryCoachingSchema.safeParse(fallback).success).toBe(true);
+    expect(fallback.observations).toHaveLength(3);
+    expect(fallback.exercises).toHaveLength(3);
+    expect(fallback.observations[0]).toContain("6 pauses");
+    expect(fallback.observations.some((item) => item.includes("6.2 dB"))).toBe(true);
+  });
+
+  it("mixes camera and voice in fallback observations when both are present", () => {
+    const fallback = fallbackDeliveryCoaching({ ...sampleInput, voice: voiceSample });
+    expect(fallback.observations).toHaveLength(3);
+    expect(fallback.observations[0]).toContain("62%");
+    expect(fallback.observations[2]).toContain("pauses");
+  });
+
   it("validates structured coaching output adhering to schema", () => {
     const valid = {
       observations: [

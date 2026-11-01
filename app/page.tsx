@@ -168,9 +168,10 @@ export default function Home() {
           {result.review.improved_sentence && <div className="improved-sentence"><span>ONE WAY TO REPHRASE</span><p>{result.review.improved_sentence}</p></div>}
           </>}
           {result.transcriptionSource === "audio-fallback" && <div className="review-section result-transcript"><h3>Your transcript</h3><p>{result.text}</p></div>}
-          {result.deliveryInsights && (
+          {(result.deliveryInsights || result.voiceInsights) && (
             <DeliveryInsightsView
               metrics={result.deliveryInsights}
+              voice={result.voiceInsights}
               coaching={result.deliveryCoaching}
             />
           )}
